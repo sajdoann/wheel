@@ -63,8 +63,10 @@ const winnerDialog = document.querySelector("#winnerDialog");
 const dialogWinner = document.querySelector("#dialogWinner");
 const dialogDetail = document.querySelector("#dialogDetail");
 const spinAgainButton = document.querySelector("#spinAgainButton");
+const winnerSound = new Audio("pwlpl-applause-sound-effect-521104.mp3");
+winnerSound.preload = "auto";
+winnerSound.volume = 0.9;
 
-let audioContext;
 let hashWriteTimer;
 let confetti = [];
 let fireworkFrame;
@@ -410,138 +412,21 @@ function normalizeRotation(value) {
 }
 
 function unlockAudio() {
-  if (state.muted || audioContext) {
-    if (audioContext?.state === "suspended") {
-      audioContext.resume();
-    }
+  if (state.muted) {
     return;
   }
 
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) {
-    return;
-  }
-
-  audioContext = new AudioContext();
-  if (audioContext.state === "suspended") {
-    audioContext.resume();
-  }
+  winnerSound.load();
 }
 
 function playPartyCheer() {
-  if (state.muted || !audioContext) {
+  if (state.muted) {
     return;
   }
 
-  const master = audioContext.createGain();
-  const compressor = audioContext.createDynamicsCompressor();
-  master.gain.setValueAtTime(0.74, audioContext.currentTime);
-  master.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 2.9);
-  master.connect(compressor);
-  compressor.connect(audioContext.destination);
-
-  playCrowdRoar(master);
-  playClapStorm(master);
-  playWhoops(master);
-
-  window.setTimeout(() => {
-    master.disconnect();
-    compressor.disconnect();
-  }, 3300);
-}
-
-function playCrowdRoar(destination) {
-  const duration = 2.9;
-  const sampleRate = audioContext.sampleRate;
-  const buffer = audioContext.createBuffer(1, Math.ceil(duration * sampleRate), sampleRate);
-  const data = buffer.getChannelData(0);
-
-  for (let i = 0; i < data.length; i += 1) {
-    const t = i / sampleRate;
-    const noise = Math.random() * 2 - 1;
-    const tremble = 0.68 + Math.sin(t * 19) * 0.18 + Math.sin(t * 33) * 0.1;
-    const envelope = Math.min(1, t * 4.5) * Math.max(0, 1 - t / duration);
-    data[i] = noise * tremble * envelope;
-  }
-
-  const source = audioContext.createBufferSource();
-  const gain = audioContext.createGain();
-  const filter = audioContext.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.value = 950;
-  filter.Q.value = 0.65;
-  gain.gain.value = 0.18;
-  source.buffer = buffer;
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(destination);
-  source.start();
-}
-
-function playClapStorm(destination) {
-  const now = audioContext.currentTime;
-  for (let i = 0; i < 115; i += 1) {
-    const offset = Math.random() * 2.45;
-    const intensity = 0.15 + Math.random() * 0.22;
-    scheduleClap(now + offset, intensity, destination);
-  }
-}
-
-function scheduleClap(startTime, intensity, destination) {
-  const duration = 0.085 + Math.random() * 0.035;
-  const sampleRate = audioContext.sampleRate;
-  const buffer = audioContext.createBuffer(1, Math.ceil(duration * sampleRate), sampleRate);
-  const data = buffer.getChannelData(0);
-
-  for (let i = 0; i < data.length; i += 1) {
-    const t = i / sampleRate;
-    const snap = Math.exp(-t * 55);
-    const slap = Math.exp(-Math.max(0, t - 0.016) * 34);
-    data[i] = (Math.random() * 2 - 1) * (snap + slap * 0.55);
-  }
-
-  const source = audioContext.createBufferSource();
-  const filter = audioContext.createBiquadFilter();
-  const gain = audioContext.createGain();
-  filter.type = "highpass";
-  filter.frequency.value = 900 + Math.random() * 700;
-  gain.gain.setValueAtTime(intensity, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-  source.buffer = buffer;
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(destination);
-  source.start(startTime);
-}
-
-function playWhoops(destination) {
-  const now = audioContext.currentTime;
-  for (let i = 0; i < 11; i += 1) {
-    const start = now + 0.08 + Math.random() * 1.85;
-    const length = 0.38 + Math.random() * 0.36;
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    const filter = audioContext.createBiquadFilter();
-    const base = 360 + Math.random() * 240;
-    const peak = 760 + Math.random() * 620;
-
-    oscillator.type = Math.random() > 0.5 ? "sawtooth" : "triangle";
-    oscillator.frequency.setValueAtTime(base, start);
-    oscillator.frequency.exponentialRampToValueAtTime(peak, start + length * 0.45);
-    oscillator.frequency.exponentialRampToValueAtTime(base * 0.8, start + length);
-    filter.type = "bandpass";
-    filter.frequency.value = 1150 + Math.random() * 900;
-    filter.Q.value = 3.2;
-    gain.gain.setValueAtTime(0.001, start);
-    gain.gain.linearRampToValueAtTime(0.08 + Math.random() * 0.05, start + 0.045);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + length);
-
-    oscillator.connect(filter);
-    filter.connect(gain);
-    gain.connect(destination);
-    oscillator.start(start);
-    oscillator.stop(start + length + 0.04);
-  }
+  winnerSound.pause();
+  winnerSound.currentTime = 0;
+  winnerSound.play().catch(() => {});
 }
 
 function resizeCelebrationCanvas() {
