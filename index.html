@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101827">
+    <meta
+      name="description"
+      content="A lightweight, ad-free wheel picker for names, raffles, classrooms, and team games."
+    >
+    <title>Wheel Picker</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <canvas id="celebrationCanvas" class="celebration-canvas" aria-hidden="true"></canvas>
+
+    <main class="app-shell">
+      <section class="wheel-panel" aria-labelledby="appTitle">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">Ad-free random picker</p>
+            <h1 id="appTitle">Wheel Picker</h1>
+          </div>
+          <button id="muteButton" class="icon-button" type="button" aria-pressed="false">
+            Sound on
+          </button>
+        </div>
+
+        <div class="wheel-wrap">
+          <div class="pointer" aria-hidden="true"></div>
+          <canvas id="wheelCanvas" width="720" height="720" aria-label="Random picker wheel"></canvas>
+          <button id="spinButton" class="spin-button" type="button">Spin</button>
+        </div>
+
+        <div class="result-strip" role="status" aria-live="polite">
+          <span class="label">Selected</span>
+          <strong id="winnerText">Nobody yet</strong>
+        </div>
+      </section>
+
+      <aside class="controls-panel" aria-labelledby="entriesTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">People</p>
+            <h2 id="entriesTitle">Edit the wheel</h2>
+          </div>
+          <span id="entryCount" class="count-pill">0 entries</span>
+        </div>
+
+        <form id="addForm" class="add-form">
+          <label for="nameInput">Add names</label>
+          <div class="input-row">
+            <input
+              id="nameInput"
+              name="name"
+              type="text"
+              autocomplete="off"
+              placeholder="Ada, Linus, Grace"
+            >
+            <button type="submit">Add</button>
+          </div>
+          <p class="hint">Paste or type multiple names separated by commas, semicolons, or new lines.</p>
+        </form>
+
+        <div class="option-row">
+          <label class="switch-label" for="removeWinner">
+            <input id="removeWinner" type="checkbox" checked>
+            <span>Remove winner after selection</span>
+          </label>
+        </div>
+
+        <div class="toolbar" aria-label="Entry actions">
+          <button id="shuffleButton" type="button">Shuffle</button>
+          <button id="sampleButton" type="button">Sample</button>
+          <button id="clearButton" type="button" class="danger">Clear</button>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          Add at least one person to start spinning.
+        </div>
+        <ul id="entriesList" class="entries-list" aria-label="Wheel entries"></ul>
+
+        <div class="share-box">
+          <div>
+            <strong>Shareable by URL</strong>
+            <p>The names and options live in the address bar hash. Copy the page URL to share this wheel.</p>
+          </div>
+          <button id="copyButton" type="button">Copy link</button>
+        </div>
+      </aside>
+    </main>
+
+    <dialog id="winnerDialog" class="winner-dialog">
+      <form method="dialog">
+        <p class="eyebrow">Winner</p>
+        <h2 id="dialogWinner">Nobody yet</h2>
+        <p id="dialogDetail">Spin the wheel to pick someone.</p>
+        <div class="dialog-actions">
+          <button id="spinAgainButton" value="spin-again" type="button">Spin again</button>
+          <button value="close">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>
