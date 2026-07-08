@@ -52,8 +52,6 @@ const winnerText = document.querySelector("#winnerText");
 const addForm = document.querySelector("#addForm");
 const nameInput = document.querySelector("#nameInput");
 const removeWinnerInput = document.querySelector("#removeWinner");
-const shuffleButton = document.querySelector("#shuffleButton");
-const sampleButton = document.querySelector("#sampleButton");
 const clearButton = document.querySelector("#clearButton");
 const copyButton = document.querySelector("#copyButton");
 const entriesList = document.querySelector("#entriesList");
@@ -145,19 +143,6 @@ function bindEvents() {
     saveToHash();
   });
 
-  shuffleButton.addEventListener("click", () => {
-    state.entries = shuffled(state.entries);
-    render();
-    saveToHash();
-  });
-
-  sampleButton.addEventListener("click", () => {
-    state.entries = [...DEFAULT_ENTRIES];
-    state.winner = "";
-    render();
-    saveToHash();
-  });
-
   clearButton.addEventListener("click", () => {
     state.entries = [];
     state.winner = "";
@@ -209,7 +194,6 @@ function updateEntries() {
   entryCount.textContent = `${state.entries.length} ${state.entries.length === 1 ? "entry" : "entries"}`;
   emptyState.style.display = state.entries.length === 0 ? "block" : "none";
   spinButton.disabled = state.entries.length === 0 || state.spinning;
-  shuffleButton.disabled = state.entries.length < 2 || state.spinning;
   clearButton.disabled = state.entries.length === 0 || state.spinning;
 
   state.entries.forEach((entry, index) => {
@@ -341,7 +325,6 @@ function spinWheel() {
 
   state.spinning = true;
   spinButton.disabled = true;
-  shuffleButton.disabled = true;
   clearButton.disabled = true;
 
   function tick(now) {
@@ -417,15 +400,6 @@ function randomIndex(max) {
   const array = new Uint32Array(1);
   crypto.getRandomValues(array);
   return array[0] % max;
-}
-
-function shuffled(values) {
-  const next = [...values];
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = randomIndex(i + 1);
-    [next[i], next[j]] = [next[j], next[i]];
-  }
-  return next;
 }
 
 function easeOutCubic(value) {
