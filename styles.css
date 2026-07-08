@@ -34,6 +34,25 @@ body {
     linear-gradient(135deg, #101827 0%, #1b2f4f 100%);
 }
 
+body::before {
+  position: fixed;
+  z-index: 9;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(250, 204, 21, 0.38), transparent 18rem),
+    radial-gradient(circle at 78% 22%, rgba(244, 114, 182, 0.32), transparent 16rem),
+    radial-gradient(circle at 52% 82%, rgba(34, 211, 238, 0.28), transparent 18rem);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+body.celebrating::before {
+  animation: partyPulse 520ms ease-in-out infinite alternate;
+  opacity: 1;
+}
+
 button,
 input {
   font: inherit;
@@ -349,7 +368,7 @@ h2 {
 
 .celebration-canvas {
   position: fixed;
-  z-index: 10;
+  z-index: 11;
   inset: 0;
   pointer-events: none;
 }
@@ -439,5 +458,21 @@ h2 {
   *::before,
   *::after {
     scroll-behavior: auto !important;
+  }
+
+  body.celebrating::before {
+    animation: none;
+  }
+}
+
+@keyframes partyPulse {
+  from {
+    filter: saturate(1) brightness(1);
+    transform: scale(1);
+  }
+
+  to {
+    filter: saturate(1.55) brightness(1.2);
+    transform: scale(1.02);
   }
 }

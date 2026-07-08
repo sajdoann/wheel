@@ -22,6 +22,16 @@ const COLORS = [
   "#0d9488",
 ];
 
+const PARTY_COLORS = [
+  ...COLORS,
+  "#facc15",
+  "#fef3c7",
+  "#f472b6",
+  "#22d3ee",
+  "#ffffff",
+  "#c4b5fd",
+];
+
 const state = {
   entries: [],
   removeWinner: DEFAULT_REMOVE_WINNER,
@@ -58,6 +68,7 @@ let audioContext;
 let hashWriteTimer;
 let confetti = [];
 let fireworkFrame;
+let celebrationClassTimer;
 
 function init() {
   loadFromHash();
@@ -366,8 +377,8 @@ function announceWinner(winner) {
     ? "Selected and removed from the wheel."
     : "Selected and still available for future spins.";
 
-  playApplause();
-  startFireworks();
+  playPartyCheer();
+  startPartyBurst();
 
   if (typeof winnerDialog.showModal === "function") {
     winnerDialog.showModal();
@@ -417,36 +428,120 @@ function unlockAudio() {
   }
 }
 
-function playApplause() {
+function playPartyCheer() {
   if (state.muted || !audioContext) {
     return;
   }
 
-  const duration = 1.35;
+  const master = audioContext.createGain();
+  const compressor = audioContext.createDynamicsCompressor();
+  master.gain.setValueAtTime(0.74, audioContext.currentTime);
+  master.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 2.9);
+  master.connect(compressor);
+  compressor.connect(audioContext.destination);
+
+  playCrowdRoar(master);
+  playClapStorm(master);
+  playWhoops(master);
+
+  window.setTimeout(() => {
+    master.disconnect();
+    compressor.disconnect();
+  }, 3300);
+}
+
+function playCrowdRoar(destination) {
+  const duration = 2.9;
   const sampleRate = audioContext.sampleRate;
-  const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
+  const buffer = audioContext.createBuffer(1, Math.ceil(duration * sampleRate), sampleRate);
   const data = buffer.getChannelData(0);
 
   for (let i = 0; i < data.length; i += 1) {
     const t = i / sampleRate;
-    const burst = Math.sin(t * 88) * Math.sin(t * 143);
     const noise = Math.random() * 2 - 1;
-    const envelope = Math.min(1, t * 5) * Math.max(0, 1 - t / duration);
-    data[i] = (noise * 0.32 + burst * 0.18) * envelope;
+    const tremble = 0.68 + Math.sin(t * 19) * 0.18 + Math.sin(t * 33) * 0.1;
+    const envelope = Math.min(1, t * 4.5) * Math.max(0, 1 - t / duration);
+    data[i] = noise * tremble * envelope;
   }
 
   const source = audioContext.createBufferSource();
   const gain = audioContext.createGain();
   const filter = audioContext.createBiquadFilter();
   filter.type = "bandpass";
-  filter.frequency.value = 1600;
-  filter.Q.value = 0.8;
-  gain.gain.value = 0.55;
+  filter.frequency.value = 950;
+  filter.Q.value = 0.65;
+  gain.gain.value = 0.18;
   source.buffer = buffer;
   source.connect(filter);
   filter.connect(gain);
-  gain.connect(audioContext.destination);
+  gain.connect(destination);
   source.start();
+}
+
+function playClapStorm(destination) {
+  const now = audioContext.currentTime;
+  for (let i = 0; i < 115; i += 1) {
+    const offset = Math.random() * 2.45;
+    const intensity = 0.15 + Math.random() * 0.22;
+    scheduleClap(now + offset, intensity, destination);
+  }
+}
+
+function scheduleClap(startTime, intensity, destination) {
+  const duration = 0.085 + Math.random() * 0.035;
+  const sampleRate = audioContext.sampleRate;
+  const buffer = audioContext.createBuffer(1, Math.ceil(duration * sampleRate), sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < data.length; i += 1) {
+    const t = i / sampleRate;
+    const snap = Math.exp(-t * 55);
+    const slap = Math.exp(-Math.max(0, t - 0.016) * 34);
+    data[i] = (Math.random() * 2 - 1) * (snap + slap * 0.55);
+  }
+
+  const source = audioContext.createBufferSource();
+  const filter = audioContext.createBiquadFilter();
+  const gain = audioContext.createGain();
+  filter.type = "highpass";
+  filter.frequency.value = 900 + Math.random() * 700;
+  gain.gain.setValueAtTime(intensity, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  source.buffer = buffer;
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  source.start(startTime);
+}
+
+function playWhoops(destination) {
+  const now = audioContext.currentTime;
+  for (let i = 0; i < 11; i += 1) {
+    const start = now + 0.08 + Math.random() * 1.85;
+    const length = 0.38 + Math.random() * 0.36;
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const filter = audioContext.createBiquadFilter();
+    const base = 360 + Math.random() * 240;
+    const peak = 760 + Math.random() * 620;
+
+    oscillator.type = Math.random() > 0.5 ? "sawtooth" : "triangle";
+    oscillator.frequency.setValueAtTime(base, start);
+    oscillator.frequency.exponentialRampToValueAtTime(peak, start + length * 0.45);
+    oscillator.frequency.exponentialRampToValueAtTime(base * 0.8, start + length);
+    filter.type = "bandpass";
+    filter.frequency.value = 1150 + Math.random() * 900;
+    filter.Q.value = 3.2;
+    gain.gain.setValueAtTime(0.001, start);
+    gain.gain.linearRampToValueAtTime(0.08 + Math.random() * 0.05, start + 0.045);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + length);
+
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(destination);
+    oscillator.start(start);
+    oscillator.stop(start + length + 0.04);
+  }
 }
 
 function resizeCelebrationCanvas() {
@@ -455,7 +550,7 @@ function resizeCelebrationCanvas() {
   celebrationCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
 }
 
-function startFireworks() {
+function startPartyBurst() {
   if (reducedMotion) {
     return;
   }
@@ -463,50 +558,144 @@ function startFireworks() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   confetti = [];
+  document.body.classList.add("celebrating");
+  clearTimeout(celebrationClassTimer);
+  celebrationClassTimer = setTimeout(() => {
+    document.body.classList.remove("celebrating");
+  }, 3000);
 
-  for (let i = 0; i < 150; i += 1) {
+  for (let i = 0; i < 260; i += 1) {
     confetti.push({
+      type: "confetti",
       x: width * (0.2 + Math.random() * 0.6),
       y: height * (0.18 + Math.random() * 0.2),
-      vx: (Math.random() - 0.5) * 8,
-      vy: (Math.random() - 0.8) * 8,
-      size: 4 + Math.random() * 6,
-      color: COLORS[randomIndex(COLORS.length)],
-      life: 80 + randomIndex(45),
+      vx: (Math.random() - 0.5) * 13,
+      vy: -8 - Math.random() * 10,
+      gravity: 0.16 + Math.random() * 0.09,
+      drag: 0.985,
+      size: 4 + Math.random() * 10,
+      color: PARTY_COLORS[randomIndex(PARTY_COLORS.length)],
+      life: 110 + randomIndex(80),
       spin: Math.random() * Math.PI,
+      spinSpeed: (Math.random() - 0.5) * 0.42,
+      twinkle: Math.random() * Math.PI * 2,
+    });
+  }
+
+  for (let i = 0; i < 160; i += 1) {
+    confetti.push({
+      type: "glitter",
+      x: Math.random() * width,
+      y: height * (0.05 + Math.random() * 0.35),
+      vx: (Math.random() - 0.5) * 4,
+      vy: -2 - Math.random() * 5,
+      gravity: 0.07 + Math.random() * 0.08,
+      drag: 0.995,
+      size: 1.5 + Math.random() * 4,
+      color: PARTY_COLORS[randomIndex(PARTY_COLORS.length)],
+      life: 90 + randomIndex(100),
+      spin: Math.random() * Math.PI,
+      spinSpeed: 0.08 + Math.random() * 0.22,
+      twinkle: Math.random() * Math.PI * 2,
+    });
+  }
+
+  for (let i = 0; i < 70; i += 1) {
+    const fromLeft = i % 2 === 0;
+    confetti.push({
+      type: "streamer",
+      x: fromLeft ? -20 : width + 20,
+      y: height * (0.38 + Math.random() * 0.34),
+      vx: (fromLeft ? 1 : -1) * (5 + Math.random() * 8),
+      vy: -7 - Math.random() * 7,
+      gravity: 0.13 + Math.random() * 0.07,
+      drag: 0.99,
+      size: 12 + Math.random() * 20,
+      color: PARTY_COLORS[randomIndex(PARTY_COLORS.length)],
+      life: 120 + randomIndex(70),
+      spin: Math.random() * Math.PI,
+      spinSpeed: (Math.random() - 0.5) * 0.28,
+      twinkle: Math.random() * Math.PI * 2,
     });
   }
 
   cancelAnimationFrame(fireworkFrame);
-  animateFireworks();
+  animatePartyBurst();
 }
 
-function animateFireworks() {
+function animatePartyBurst() {
   celebrationCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   confetti = confetti.filter((piece) => piece.life > 0);
 
   confetti.forEach((piece) => {
     piece.x += piece.vx;
     piece.y += piece.vy;
-    piece.vy += 0.12;
-    piece.vx *= 0.99;
+    piece.vy += piece.gravity;
+    piece.vx *= piece.drag;
     piece.life -= 1;
-    piece.spin += 0.18;
+    piece.spin += piece.spinSpeed;
+    piece.twinkle += 0.22;
 
     celebrationCtx.save();
     celebrationCtx.translate(piece.x, piece.y);
     celebrationCtx.rotate(piece.spin);
-    celebrationCtx.globalAlpha = Math.min(1, piece.life / 30);
+    celebrationCtx.globalAlpha = Math.min(1, piece.life / 35);
     celebrationCtx.fillStyle = piece.color;
-    celebrationCtx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size * 0.62);
+
+    if (piece.type === "glitter") {
+      drawGlitter(piece);
+    } else if (piece.type === "streamer") {
+      drawStreamer(piece);
+    } else {
+      celebrationCtx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size * 0.55);
+    }
+
     celebrationCtx.restore();
   });
 
   if (confetti.length > 0) {
-    fireworkFrame = requestAnimationFrame(animateFireworks);
+    fireworkFrame = requestAnimationFrame(animatePartyBurst);
   } else {
     celebrationCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    document.body.classList.remove("celebrating");
   }
+}
+
+function drawGlitter(piece) {
+  const pulse = 0.65 + Math.sin(piece.twinkle) * 0.35;
+  const size = piece.size * pulse;
+  celebrationCtx.shadowColor = piece.color;
+  celebrationCtx.shadowBlur = 14;
+  celebrationCtx.beginPath();
+  celebrationCtx.moveTo(0, -size * 1.8);
+  celebrationCtx.lineTo(size * 0.45, -size * 0.45);
+  celebrationCtx.lineTo(size * 1.8, 0);
+  celebrationCtx.lineTo(size * 0.45, size * 0.45);
+  celebrationCtx.lineTo(0, size * 1.8);
+  celebrationCtx.lineTo(-size * 0.45, size * 0.45);
+  celebrationCtx.lineTo(-size * 1.8, 0);
+  celebrationCtx.lineTo(-size * 0.45, -size * 0.45);
+  celebrationCtx.closePath();
+  celebrationCtx.fill();
+}
+
+function drawStreamer(piece) {
+  celebrationCtx.lineWidth = Math.max(2, piece.size * 0.14);
+  celebrationCtx.lineCap = "round";
+  celebrationCtx.strokeStyle = piece.color;
+  celebrationCtx.shadowColor = piece.color;
+  celebrationCtx.shadowBlur = 8;
+  celebrationCtx.beginPath();
+  for (let i = 0; i < 5; i += 1) {
+    const x = (i - 2) * piece.size * 0.28;
+    const y = Math.sin(piece.twinkle + i * 0.8) * piece.size * 0.22;
+    if (i === 0) {
+      celebrationCtx.moveTo(x, y);
+    } else {
+      celebrationCtx.lineTo(x, y);
+    }
+  }
+  celebrationCtx.stroke();
 }
 
 function saveToHash(force = false) {
