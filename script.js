@@ -310,43 +310,36 @@ function drawEmptyWheel(radius) {
 
 function drawWheelLabel(entry, count, radius, arc) {
   const outerPadding = 30;
-  const centerClearance = radius * 0.35;
+  const centerClearance = radius * 0.3;
   const labelX = radius - outerPadding;
   const maxTextWidth = Math.max(36, labelX - centerClearance);
   const fontSize = Math.round(clamp(arc * radius * 0.38, 11, 22));
+  const minFontSize = 8;
+  const label = entry.trim();
 
-  if (count > 64 || fontSize < 11) {
+  if (count > 64 || fontSize < minFontSize || !label) {
     return;
   }
 
   wheelCtx.textAlign = "right";
   wheelCtx.textBaseline = "middle";
   wheelCtx.fillStyle = "#fff";
-  wheelCtx.font = `800 ${fontSize}px system-ui, sans-serif`;
+  wheelCtx.font = `800 ${fitFontSizeToWidth(label, fontSize, minFontSize, maxTextWidth)}px system-ui, sans-serif`;
   wheelCtx.shadowColor = "rgba(0, 0, 0, 0.3)";
   wheelCtx.shadowBlur = 4;
 
-  const label = fitLabelToWidth(entry, maxTextWidth);
-  if (label) {
-    wheelCtx.fillText(label, labelX, 0);
-  }
+  wheelCtx.fillText(label, labelX, 0, maxTextWidth);
 }
 
-function fitLabelToWidth(entry, maxWidth) {
-  const label = entry.trim();
-  if (wheelCtx.measureText(label).width <= maxWidth) {
-    return label;
-  }
-
-  const suffix = "...";
-  for (let length = label.length - 1; length > 1; length -= 1) {
-    const truncated = `${label.slice(0, length)}${suffix}`;
-    if (wheelCtx.measureText(truncated).width <= maxWidth) {
-      return truncated;
+function fitFontSizeToWidth(label, startSize, minSize, maxWidth) {
+  for (let size = startSize; size > minSize; size -= 1) {
+    wheelCtx.font = `800 ${size}px system-ui, sans-serif`;
+    if (wheelCtx.measureText(label).width <= maxWidth) {
+      return size;
     }
   }
 
-  return "";
+  return minSize;
 }
 
 function clamp(value, min, max) {
