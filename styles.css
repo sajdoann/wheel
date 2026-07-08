@@ -210,6 +210,12 @@ h2 {
   text-transform: uppercase;
 }
 
+.wheel-wrap.is-empty .spin-button {
+  background: #e2e8f0;
+  color: #64748b;
+  box-shadow: none;
+}
+
 .result-strip {
   display: flex;
   align-items: center;
@@ -311,7 +317,7 @@ h2 {
   border: 1px dashed var(--line);
   border-radius: 8px;
   color: var(--muted);
-  padding: 1.2rem;
+  padding: 1rem;
   text-align: center;
 }
 

@@ -46,6 +46,7 @@ const wheelCanvas = document.querySelector("#wheelCanvas");
 const wheelCtx = wheelCanvas.getContext("2d");
 const celebrationCanvas = document.querySelector("#celebrationCanvas");
 const celebrationCtx = celebrationCanvas.getContext("2d");
+const wheelWrap = document.querySelector(".wheel-wrap");
 const spinButton = document.querySelector("#spinButton");
 const muteButton = document.querySelector("#muteButton");
 const winnerText = document.querySelector("#winnerText");
@@ -191,6 +192,7 @@ function updateMuteButton() {
 
 function updateEntries() {
   entriesList.innerHTML = "";
+  wheelWrap.classList.toggle("is-empty", state.entries.length === 0);
   entryCount.textContent = `${state.entries.length} ${state.entries.length === 1 ? "entry" : "entries"}`;
   emptyState.style.display = state.entries.length === 0 ? "block" : "none";
   spinButton.disabled = state.entries.length === 0 || state.spinning;
@@ -290,16 +292,11 @@ function drawWheel() {
 function drawEmptyWheel(radius) {
   wheelCtx.beginPath();
   wheelCtx.arc(0, 0, radius, 0, Math.PI * 2);
-  wheelCtx.fillStyle = "#dbeafe";
+  wheelCtx.fillStyle = "#eef4ff";
   wheelCtx.fill();
   wheelCtx.lineWidth = 12;
   wheelCtx.strokeStyle = "#ffffff";
   wheelCtx.stroke();
-  wheelCtx.fillStyle = "#31506f";
-  wheelCtx.textAlign = "center";
-  wheelCtx.textBaseline = "middle";
-  wheelCtx.font = "800 34px system-ui, sans-serif";
-  wheelCtx.fillText("Add names", 0, 0);
 }
 
 function fitLabel(entry, count) {
