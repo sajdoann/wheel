@@ -9,6 +9,9 @@ const DEFAULT_ENTRIES = [
 
 const DEFAULT_REMOVE_WINNER = true;
 const SLOWDOWN_SOUND_FALLBACK_MS = 2424;
+const SLOWDOWN_SOUND_START_RATE = 0.75;
+const SLOWDOWN_SOUND_END_RATE = 0.42;
+const SLICE_EDGE_SAFE_ZONE = 0.14;
 
 const COLORS = [
   "#2563eb",
@@ -277,15 +280,13 @@ function drawWheel() {
     wheelCtx.stroke();
 
     wheelCtx.save();
+    wheelCtx.beginPath();
+    wheelCtx.moveTo(0, 0);
+    wheelCtx.arc(0, 0, radius, start, end);
+    wheelCtx.closePath();
+    wheelCtx.clip();
     wheelCtx.rotate(start + arc / 2);
-    wheelCtx.textAlign = "right";
-    wheelCtx.textBaseline = "middle";
-    wheelCtx.fillStyle = "#fff";
-    wheelCtx.font = "800 28px system-ui, sans-serif";
-    wheelCtx.shadowColor = "rgba(0, 0, 0, 0.3)";
-    wheelCtx.shadowBlur = 4;
-    const label = fitLabel(entry, state.entries.length);
-    wheelCtx.fillText(label, radius - 34, 0, radius * 0.6);
+    drawWheelLabel(entry, state.entries.length, radius, arc);
     wheelCtx.restore();
   });
 
@@ -307,9 +308,49 @@ function drawEmptyWheel(radius) {
   wheelCtx.stroke();
 }
 
-function fitLabel(entry, count) {
-  const maxLength = count > 18 ? 14 : count > 10 ? 18 : 28;
-  return entry.length > maxLength ? `${entry.slice(0, maxLength - 1)}...` : entry;
+function drawWheelLabel(entry, count, radius, arc) {
+  const outerPadding = 30;
+  const centerClearance = radius * 0.35;
+  const labelX = radius - outerPadding;
+  const maxTextWidth = Math.max(36, labelX - centerClearance);
+  const fontSize = Math.round(clamp(arc * radius * 0.38, 11, 22));
+
+  if (count > 64 || fontSize < 11) {
+    return;
+  }
+
+  wheelCtx.textAlign = "right";
+  wheelCtx.textBaseline = "middle";
+  wheelCtx.fillStyle = "#fff";
+  wheelCtx.font = `800 ${fontSize}px system-ui, sans-serif`;
+  wheelCtx.shadowColor = "rgba(0, 0, 0, 0.3)";
+  wheelCtx.shadowBlur = 4;
+
+  const label = fitLabelToWidth(entry, maxTextWidth);
+  if (label) {
+    wheelCtx.fillText(label, labelX, 0);
+  }
+}
+
+function fitLabelToWidth(entry, maxWidth) {
+  const label = entry.trim();
+  if (wheelCtx.measureText(label).width <= maxWidth) {
+    return label;
+  }
+
+  const suffix = "...";
+  for (let length = label.length - 1; length > 1; length -= 1) {
+    const truncated = `${label.slice(0, length)}${suffix}`;
+    if (wheelCtx.measureText(truncated).width <= maxWidth) {
+      return truncated;
+    }
+  }
+
+  return "";
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function spinWheel() {
@@ -320,31 +361,25 @@ function spinWheel() {
   unlockAudio();
   const winnerIndex = randomIndex(state.entries.length);
   const arc = (Math.PI * 2) / state.entries.length;
-  const targetCenter = winnerIndex * arc + arc / 2;
-  const fullTurns = reducedMotion ? 1 : 6 + randomIndex(4);
-  const targetRotation = fullTurns * Math.PI * 2 - targetCenter;
+  const targetPoint = winnerIndex * arc + getSliceLandingOffset(arc);
+  const fullTurns = reducedMotion ? 1 : 6 + randomIndex(3);
   const startRotation = state.rotation;
-  const endRotation = targetRotation;
-  const duration = reducedMotion ? 350 : 4700 + randomIndex(1000);
+  const endRotation = getForwardTargetRotation(startRotation, targetPoint, fullTurns);
+  const duration = reducedMotion ? 350 : getSinglePassSlowdownDuration();
   const startedAt = performance.now();
-  const slowdownSoundLead = reducedMotion ? 0 : getSlowdownSoundLead(duration);
-  let slowdownSoundStarted = false;
 
   state.spinning = true;
   spinButton.disabled = true;
   clearButton.disabled = true;
+  startSlowdownClicks();
 
   function tick(now) {
     const elapsed = now - startedAt;
     const progress = Math.min(1, elapsed / duration);
-    const eased = easeOutCubic(progress);
+    const eased = easeOutQuart(progress);
     state.rotation = normalizeRotation(startRotation + (endRotation - startRotation) * eased);
     drawWheel();
-
-    if (!slowdownSoundStarted && slowdownSoundLead > 0 && duration - elapsed <= slowdownSoundLead) {
-      slowdownSoundStarted = true;
-      playSlowdownClicks();
-    }
+    updateSlowdownClicks(progress);
 
     if (progress < 1) {
       requestAnimationFrame(tick);
@@ -417,8 +452,26 @@ function randomIndex(max) {
   return array[0] % max;
 }
 
-function easeOutCubic(value) {
-  return 1 - Math.pow(1 - value, 3);
+function randomFloat() {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return array[0] / 4294967296;
+}
+
+function getSliceLandingOffset(arc) {
+  const landingRange = 1 - SLICE_EDGE_SAFE_ZONE * 2;
+  return arc * (SLICE_EDGE_SAFE_ZONE + randomFloat() * landingRange);
+}
+
+function getForwardTargetRotation(startRotation, targetPoint, fullTurns) {
+  const full = Math.PI * 2;
+  const targetRotation = normalizeRotation(-targetPoint);
+  const forwardDistance = normalizeRotation(targetRotation - startRotation);
+  return startRotation + fullTurns * full + forwardDistance;
+}
+
+function easeOutQuart(value) {
+  return 1 - Math.pow(1 - value, 4);
 }
 
 function normalizeRotation(value) {
@@ -445,26 +498,45 @@ function playPartyCheer() {
   winnerSound.play().catch(() => {});
 }
 
-function getSlowdownSoundLead(spinDuration) {
-  const audioDuration = Number.isFinite(slowdownSound.duration)
-    ? slowdownSound.duration * 1000
-    : SLOWDOWN_SOUND_FALLBACK_MS;
+function getSinglePassSlowdownDuration() {
+  const audioDuration =
+    Number.isFinite(slowdownSound.duration) && slowdownSound.duration > 0
+      ? slowdownSound.duration * 1000
+      : SLOWDOWN_SOUND_FALLBACK_MS;
+  const averagePlaybackRate = (SLOWDOWN_SOUND_START_RATE + SLOWDOWN_SOUND_END_RATE) / 2;
 
-  return Math.min(spinDuration, audioDuration);
+  return Math.round(
+    clamp(audioDuration / averagePlaybackRate - 120 + randomIndex(360), 3600, 5200),
+  );
 }
 
-function playSlowdownClicks() {
+function startSlowdownClicks() {
   if (state.muted) {
     return;
   }
 
   slowdownSound.pause();
+  slowdownSound.loop = false;
+  slowdownSound.playbackRate = SLOWDOWN_SOUND_START_RATE;
   slowdownSound.currentTime = 0;
   slowdownSound.play().catch(() => {});
 }
 
+function updateSlowdownClicks(progress) {
+  if (state.muted || slowdownSound.paused) {
+    return;
+  }
+
+  const drag = progress;
+  slowdownSound.playbackRate =
+    SLOWDOWN_SOUND_START_RATE -
+    (SLOWDOWN_SOUND_START_RATE - SLOWDOWN_SOUND_END_RATE) * drag;
+}
+
 function stopSlowdownClicks() {
   slowdownSound.pause();
+  slowdownSound.loop = false;
+  slowdownSound.playbackRate = 1;
   slowdownSound.currentTime = 0;
 }
 
