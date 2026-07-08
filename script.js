@@ -8,6 +8,7 @@ const DEFAULT_ENTRIES = [
 ];
 
 const DEFAULT_REMOVE_WINNER = true;
+const SLOWDOWN_SOUND_FALLBACK_MS = 2424;
 
 const COLORS = [
   "#2563eb",
@@ -63,8 +64,11 @@ const dialogWinner = document.querySelector("#dialogWinner");
 const dialogDetail = document.querySelector("#dialogDetail");
 const spinAgainButton = document.querySelector("#spinAgainButton");
 const winnerSound = new Audio("pwlpl-applause-sound-effect-521104.mp3");
+const slowdownSound = new Audio("freesound_community-wheel-spin-click-slow-down-101152.mp3");
 winnerSound.preload = "auto";
 winnerSound.volume = 0.9;
+slowdownSound.preload = "auto";
+slowdownSound.volume = 0.8;
 
 let hashWriteTimer;
 let confetti = [];
@@ -106,6 +110,10 @@ function bindEvents() {
 
   muteButton.addEventListener("click", () => {
     state.muted = !state.muted;
+    if (state.muted) {
+      stopSlowdownClicks();
+      winnerSound.pause();
+    }
     updateMuteButton();
     saveToHash();
   });
@@ -319,16 +327,24 @@ function spinWheel() {
   const endRotation = targetRotation;
   const duration = reducedMotion ? 350 : 4700 + randomIndex(1000);
   const startedAt = performance.now();
+  const slowdownSoundLead = reducedMotion ? 0 : getSlowdownSoundLead(duration);
+  let slowdownSoundStarted = false;
 
   state.spinning = true;
   spinButton.disabled = true;
   clearButton.disabled = true;
 
   function tick(now) {
-    const progress = Math.min(1, (now - startedAt) / duration);
+    const elapsed = now - startedAt;
+    const progress = Math.min(1, elapsed / duration);
     const eased = easeOutCubic(progress);
     state.rotation = normalizeRotation(startRotation + (endRotation - startRotation) * eased);
     drawWheel();
+
+    if (!slowdownSoundStarted && slowdownSoundLead > 0 && duration - elapsed <= slowdownSoundLead) {
+      slowdownSoundStarted = true;
+      playSlowdownClicks();
+    }
 
     if (progress < 1) {
       requestAnimationFrame(tick);
@@ -342,6 +358,8 @@ function spinWheel() {
 }
 
 function finishSpin(winnerIndex) {
+  stopSlowdownClicks();
+
   const winner = state.entries[winnerIndex];
   state.winner = winner;
   state.spinning = false;
@@ -414,6 +432,7 @@ function unlockAudio() {
   }
 
   winnerSound.load();
+  slowdownSound.load();
 }
 
 function playPartyCheer() {
@@ -424,6 +443,29 @@ function playPartyCheer() {
   winnerSound.pause();
   winnerSound.currentTime = 0;
   winnerSound.play().catch(() => {});
+}
+
+function getSlowdownSoundLead(spinDuration) {
+  const audioDuration = Number.isFinite(slowdownSound.duration)
+    ? slowdownSound.duration * 1000
+    : SLOWDOWN_SOUND_FALLBACK_MS;
+
+  return Math.min(spinDuration, audioDuration);
+}
+
+function playSlowdownClicks() {
+  if (state.muted) {
+    return;
+  }
+
+  slowdownSound.pause();
+  slowdownSound.currentTime = 0;
+  slowdownSound.play().catch(() => {});
+}
+
+function stopSlowdownClicks() {
+  slowdownSound.pause();
+  slowdownSound.currentTime = 0;
 }
 
 function resizeCelebrationCanvas() {
