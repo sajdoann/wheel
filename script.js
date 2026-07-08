@@ -71,6 +71,7 @@ let hashWriteTimer;
 let confetti = [];
 let fireworkFrame;
 let celebrationClassTimer;
+let pendingWinnerRemoval;
 
 function init() {
   loadFromHash();
@@ -98,9 +99,11 @@ function bindEvents() {
   spinButton.addEventListener("click", spinWheel);
   wheelCanvas.addEventListener("click", spinWheel);
   spinAgainButton.addEventListener("click", () => {
+    removePendingWinner();
     winnerDialog.close();
     spinWheel();
   });
+  winnerDialog.addEventListener("close", removePendingWinner);
 
   muteButton.addEventListener("click", () => {
     state.muted = !state.muted;
@@ -328,7 +331,7 @@ function spinWheel() {
   unlockAudio();
   const winnerIndex = randomIndex(state.entries.length);
   const arc = (Math.PI * 2) / state.entries.length;
-  const targetCenter = winnerIndex * arc + arc / 2 - Math.PI / 2;
+  const targetCenter = winnerIndex * arc + arc / 2;
   const fullTurns = reducedMotion ? 1 : 6 + randomIndex(4);
   const targetRotation = fullTurns * Math.PI * 2 - targetCenter;
   const startRotation = state.rotation;
@@ -362,10 +365,11 @@ function finishSpin(winnerIndex) {
   const winner = state.entries[winnerIndex];
   state.winner = winner;
   state.spinning = false;
-
-  if (state.removeWinner) {
-    state.entries.splice(winnerIndex, 1);
-  }
+  pendingWinnerRemoval = {
+    index: winnerIndex,
+    name: winner,
+    remove: state.removeWinner,
+  };
 
   render();
   saveToHash();
@@ -376,7 +380,7 @@ function announceWinner(winner) {
   winnerText.textContent = winner;
   dialogWinner.textContent = winner;
   dialogDetail.textContent = state.removeWinner
-    ? "Selected and removed from the wheel."
+    ? "Selected and will be removed after this dialog closes."
     : "Selected and still available for future spins.";
 
   playPartyCheer();
@@ -385,6 +389,28 @@ function announceWinner(winner) {
   if (typeof winnerDialog.showModal === "function") {
     winnerDialog.showModal();
   }
+}
+
+function removePendingWinner() {
+  if (!pendingWinnerRemoval) {
+    return;
+  }
+
+  const { index, name, remove } = pendingWinnerRemoval;
+  pendingWinnerRemoval = undefined;
+
+  if (!remove) {
+    return;
+  }
+
+  const removalIndex = state.entries[index] === name ? index : state.entries.indexOf(name);
+  if (removalIndex === -1) {
+    return;
+  }
+
+  state.entries.splice(removalIndex, 1);
+  render();
+  saveToHash();
 }
 
 function randomIndex(max) {
@@ -606,6 +632,8 @@ function saveToHash(force = false) {
 }
 
 function loadFromHash() {
+  pendingWinnerRemoval = undefined;
+
   if (!window.location.hash) {
     state.entries = [];
     state.removeWinner = DEFAULT_REMOVE_WINNER;
